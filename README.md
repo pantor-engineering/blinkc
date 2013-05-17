@@ -5,7 +5,7 @@ blinkc.js generates source code from one ore more blink schemas. The
 tool is modular and will eventually support multiple output
 formats. Currently only Java is supported.
 
-You run blinkc using nodejs like such:
+You run blinkc using nodejs like this:
 
     nodejs blinkc.js -m java my.blink -p org.example -o src
 

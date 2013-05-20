@@ -181,7 +181,7 @@ function createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
    // Classes for groups
 
    grps.forEach (function (g) { 
-      createGroupClass (g, ns, schema, wcl, singleWrapper, "static"); 
+      createGroupClass (g, ns, schema, wcl, base, singleWrapper, "static"); 
    });
 
    // Write result to file

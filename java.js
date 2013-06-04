@@ -43,6 +43,8 @@ module.provide (start);
 var cl;
 var verbosity;
 
+var Mode = util.toEnum ("PkgPerNs", "WrapperPerNs", "SingleWrapper");
+
 function start (baseCl, load)
 {
    cl = util.parseCmdLine ([
@@ -93,7 +95,7 @@ function transform (schema)
       var grps = schema.getGroups ();
       var pkg = getPackage (w, schema);
       createWrapperFile (schema, w, pkg, base, defs, grps, dir, 
-			 true /* single wrapper */);
+			 Mode.SingleWrapper);
    }
    else if (cl.has ("wrapper-per-ns"))
    {
@@ -114,7 +116,8 @@ function transform (schema)
                ns = ns.replace (path.extname (ns), "");
             }
          }
-         createWrapperFile (schema, ns, pkg, base, defs, grps, dir);
+         createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
+			    Mode.WrapperPerNs);
       });
    }
    else // One subpackage per ns
@@ -152,8 +155,7 @@ function transform (schema)
    }
 }
 
-function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, 
-			    singleWrapper)
+function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, mode)
 {
    if (! ns)
    {
@@ -181,7 +183,7 @@ function createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
    // Classes for groups
 
    grps.forEach (function (g) { 
-      createGroupClass (g, ns, schema, wcl, base, singleWrapper, "static"); 
+      createGroupClass (g, ns, schema, wcl, base, mode, "static"); 
    });
 
    // Write result to file
@@ -200,7 +202,7 @@ function createClassFile (g, ns, schema, pkg, base, dir)
    if (pkg)
       ent.ln ("package %s;", pkg).ln ();
 
-   createGroupClass (g, ns, schema, ent, base); 
+   createGroupClass (g, ns, schema, ent, base, Mode.PkgPerNs);
    cg.renderJava (ent, escName (g.name), pkg, dir, verbosity);
 }
 
@@ -218,11 +220,11 @@ function createEnumFile (d, schema, pkg, dir)
    cg.renderJava (ent, escName (d.name), pkg, dir, verbosity);
 }
 
-function createGroupClass (g, ns, schema, ent, base, singleWrapper, modifier) 
+function createGroupClass (g, ns, schema, ent, base, mode, modifier) 
 {
    var ext = "";
    if (g.superGrp)
-      ext = " extends " + qualified (g.superGrp, ns, schema, singleWrapper);
+      ext = " extends " + qualified (g.superGrp, ns, schema, mode);
    else
    {
       if (base)
@@ -236,7 +238,7 @@ function createGroupClass (g, ns, schema, ent, base, singleWrapper, modifier)
    // Getters and setters
 
    g.fields.forEach (function (f) {
-      var t = getFieldType (f.type, schema, ns, singleWrapper);
+      var t = getFieldType (f.type, schema, ns, mode);
       var mtodName = escMethodName (f.name);
       cl.ln ("public %s get%s () { return m_%s; }", t, mtodName, f.name);
 
@@ -284,7 +286,7 @@ function createGroupClass (g, ns, schema, ent, base, singleWrapper, modifier)
    // Members
 
    g.fields.forEach (function (f) {
-      var t = getFieldType (f.type, schema, ns, singleWrapper);
+      var t = getFieldType (f.type, schema, ns, mode);
       cl.ln ("private %s m_%s;", t, f.name);
    });
 }
@@ -305,10 +307,16 @@ function createEnum (d, ent, modifier)
    ent.ln ();
 }
 
-function qualified (d, ns, schema, singleWrapper)
+function qualified (d, ns, schema, mode)
 {
-   if (singleWrapper || d.ns == ns)
+   if (mode == Mode.SingleWrapper || d.ns == ns)
       return escName (d.name);
+   else if (mode == Mode.PkgPerNs)
+   {
+      var pkg = getPackage (d.ns, schema);
+      return (pkg ? pkg + "." : "") + splitCamelbackLower (d.ns) + "." + 
+         escName (d.name);
+   }
    else
    {
       var pkg = getPackage (d.ns, schema);
@@ -317,16 +325,16 @@ function qualified (d, ns, schema, singleWrapper)
    }
 }
 
-function getFieldType (t, schema, ns, singleWrapper)
+function getFieldType (t, schema, ns, mode)
 {
    if (t.isRef ())
    {
       var r = schema.resolveRef (t);
       var jt;
       if (r.group)
-         jt = qualified (r.group, ns, schema, singleWrapper);
+         jt = qualified (r.group, ns, schema, mode);
       else if (r.define)
-         jt = qualified (r.define, ns, schema, singleWrapper);
+         jt = qualified (r.define, ns, schema, mode);
       else
          jt = mapTypeCode (r.type.code);
       return jt + (r.isSequence ? " []" : "");
@@ -421,5 +429,5 @@ function escMethodName (n)
 
 function splitCamelbackLower (s)
 {
-   return s.replace (/([a-z])(?=[A-Z])/g, "$1_").toLowerCase ();
+   return escName (s.replace (/([a-z])(?=[A-Z])/g, "$1_").toLowerCase ());
 }

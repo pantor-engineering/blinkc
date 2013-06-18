@@ -55,7 +55,7 @@ var PathType = util.toEnum (
 var TypeCode = util.toEnum (
    "I8", "U8", "I16", "U16", "I32", "U32", "I64", "U64", "F64", "Decimal",
    "Date", "TimeOfDayMilli", "TimeOfDayNano", "Nanotime", "Millitime", 
-   "Bool", "Object", "String"
+   "Bool", "Object", "String", "Binary", "Fixed"
 );
 
 module.provide (
@@ -469,8 +469,19 @@ function dumpSchema ()
       else if (t.code == TypeCode.String)
       {
          spec = "string";
-         if (t.contentType)
-            spec += " (" + t.contentType + ")";
+         if (t.maxSize)
+            spec += " (" + t.maxSize + ")";
+      }
+      else if (t.code == TypeCode.Binary)
+      {
+         spec = "binary";
+         if (t.maxSize)
+            spec += " (" + t.maxSize + ")";
+      }
+      else if (t.code == TypeCode.Fixed)
+      {
+         spec = "fixed";
+         spec += " (" + t.size + ")";
       }
       else
          spec = util.decapitalize (t.code);

@@ -83,10 +83,24 @@ function create (s)
       pendType = new schema.Ref (name, defaultNs, layout, rank, annots, loc);
    }
 
-   function onStringType (rank, ct, annots, loc)
+   function onStringType (rank, maxSize, annots, loc)
    {
       pendType = new schema.Type (schema.TypeCode.String, rank, annots, loc);
-      pendType.contentType = ct;
+      if (maxSize)
+	 pendType.maxSize = maxSize;
+   }
+
+   function onBinaryType (rank, maxSize, annots, loc)
+   {
+      pendType = new schema.Type (schema.TypeCode.Binary, rank, annots, loc);
+      if (maxSize)
+	 pendType.maxSize = maxSize;
+   }
+
+   function onFixedType (rank, size, annots, loc)
+   {
+      pendType = new schema.Type (schema.TypeCode.Fixed, rank, annots, loc);
+      pendType.size = size;
    }
 
    function onPrimType (type, rank, annots, loc)
@@ -119,7 +133,7 @@ function create (s)
 
    return util.toInterface (
       onNsDecl, onStartGroupDef, onStartField, onEndField, onStartDefine,
-      onEndDefine, onStartEnum, onTypeRef, onStringType,
-      onPrimType, onEnumSym, onSchemaAnnot, onIncrAnnot
+      onEndDefine, onStartEnum, onTypeRef, onStringType, onBinaryType, 
+      onFixedType, onPrimType, onEnumSym, onSchemaAnnot, onIncrAnnot
    );
 }

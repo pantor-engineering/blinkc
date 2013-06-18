@@ -62,7 +62,9 @@ module.provide (
    //   onEndEnum       ()
    //
    //   onTypeRef       (name, layout, rank, annots, loc)
-   //   onStringType    (rank, ct, annots, loc)
+   //   onStringType    (rank, maxSize, annots, loc)
+   //   onBinaryType    (rank, maxSize, annots, loc)
+   //   onFixedType     (rank, size, annots, loc)
    //   onPrimType      (type, rank, annots, loc)
    //   onEnumSym       (name, val, annots, loc)
    //
@@ -76,7 +78,6 @@ module.provide (
    //
    //   name     - name string
    //   super    - super type string
-   //   ct       - content type string
    //   type     - schema.TypeCode.I8 | ... | schema.TypeCode.Object
    //   layout   - schema.Layout.Dynamic | schema.Layout.Static
    //   val      - enum symbol value string
@@ -87,6 +88,8 @@ module.provide (
    //   pathType - schema.PathType.Name or schema.PathType.Type
    //   annots   - is an object where each property corresponds to an annotation
    //   loc      - { line: 1, col: 1, src: "schema.blink" }
+   //   maxSize  - string or binary max size
+   //   size     - fixed size
 
    read, // (file, schemaOrObserver)
 
@@ -113,7 +116,8 @@ function readFromString (data, s, fileName)
 var Events = [
    "NsDecl", "StartGroupDef", "EndGroupDef", "StartField", "EndField",
    "StartDefine", "EndDefine", "StartEnum", "EndEnum", "TypeRef",
-   "StringType", "PrimType", "EnumSym", "SchemaAnnot", "IncrAnnot"
+   "StringType", "BinaryType", "FixedType", "PrimType", "EnumSym", 
+   "SchemaAnnot", "IncrAnnot"
 ];
 
 function makeObs (obs)
@@ -289,14 +293,49 @@ function innerRead (data, fileName, obs)
 
    // string ::=
    //    "string"
-   //  | "string" contentType
+   //  | "string" "(" uInt ")"
 
    function string ()
    {
       tok.next ();
-      ct = tok.next ("Ct") || ""
+      var maxSize;
+      if (tok.next ("("))
+      {
+	 maxSize = tok.require ("Uint", "string max size");
+	 tok.require (")");
+      }
       var r = rank ();
-      obs.onStringType (r, ct, consumeAnnots (), tok.lastLoc ())
+      obs.onStringType (r, maxSize, consumeAnnots (), tok.lastLoc ())
+   }
+
+   // binary ::=
+   //    "binary"
+   //  | "binary" "(" uInt ")"
+
+   function binary ()
+   {
+      tok.next ();
+      var maxSize;
+      if (tok.next ("("))
+      {
+	 maxSize = tok.require ("Uint", "binary max size");
+	 tok.require (")");
+      }
+      var r = rank ();
+      obs.onBinaryType (r, maxSize, consumeAnnots (), tok.lastLoc ())
+   }
+
+   // fixed ::=
+   //  | "fixed" "(" uInt ")"
+
+   function fixed ()
+   {
+      tok.next ();
+      tok.require ("(");
+      var size = tok.require ("Uint", "fixed max size");
+      tok.require (")");
+      var r = rank ();
+      obs.onFixedType (r, size, consumeAnnots (), tok.lastLoc ())
    }
 
    // "i8" ... "object"
@@ -312,7 +351,7 @@ function innerRead (data, fileName, obs)
    //    single | sequence
    //
    // single ::=
-   //    ref | time | number | string | "bool" | "object"
+   //    ref | time | number | string | binary | fixed | "bool" | "object"
 
    function type ()
    {
@@ -320,6 +359,10 @@ function innerRead (data, fileName, obs)
 	 ref ();
       else if (tok.match ("string"))
 	 string ();
+      else if (tok.match ("binary"))
+	 binary ();
+      else if (tok.match ("fixed"))
+	 fixed ();
       else if (tok.match ("namespace", "schema", "type"))
 	 tok.expected ("type specifier");
       else if (tok.matchAnyKeyword ())
@@ -430,7 +473,7 @@ function innerRead (data, fileName, obs)
    }
 
    // define ::=
-   //    nameWithId "=" annots (enum | type)
+   //    nameWithId "=" (enum | (annots type))
 
    function define ()
    {
@@ -765,11 +808,6 @@ function tokenize (s, src)
 	       err ("Expected dash after '<'");
             break;
 
-	 case '(':
-	    setToken ("Ct");
-	    readStr (')');
-            break;
-
 	 case '\\':
 	    clearText ();
 	    setToken ("Name");
@@ -889,11 +927,11 @@ function setupTokens ()
 {
    Token = {
       Int: "integer", Uint: "unsigned integer", String: "string literal", 
-      Ct: "content type", Hex: "hex number", Qname: "qualified name", 
+      Hex: "hex number", Qname: "qualified name", 
       Name: "name", End: "end of schema", "->": "'->'", "<-": "'<-'"
    }
 
-   var singles = ",.=/[]:?*|@";
+   var singles = ",.=/[]():?*|@";
 
    var keywords = 
       util.getPropertyArray (schema.TypeCode).map (util.decapitalize);

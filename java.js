@@ -369,7 +369,8 @@ function usesPodType (t, schema)
       switch (t.code)
       {
       case scm.TypeCode.Decimal: case scm.TypeCode.Object: 
-      case scm.TypeCode.String:
+      case scm.TypeCode.String: case scm.TypeCode.Binary: 
+      case scm.TypeCode.Fixed:
          return false;
       default:
          return true;
@@ -395,6 +396,8 @@ function mapTypeCode (code)
    case scm.TypeCode.Bool: return "boolean";
    case scm.TypeCode.Object: return "java.lang.Object";
    case scm.TypeCode.String: return "java.lang.String";
+   case scm.TypeCode.Binary: return "byte []";
+   case scm.TypeCode.Fixed: return "byte []";
    }
 }
 

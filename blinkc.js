@@ -68,7 +68,7 @@ function loadSchemas (arg1, arg2)
    var schemas = arg2 ? arg1 : false;
    var onLoaded = arg2 || arg1;
 
-   if (schemas)
+   if (schemas && schemas.length)
       transform (schema.create (schemas));
    else
    {

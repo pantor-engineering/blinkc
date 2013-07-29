@@ -177,12 +177,12 @@ util.extend (Entity.prototype, {
       return this;
    },
    block: function () { 
-      var comp = create (Block, util.toArray (arguments))
+      var comp = create (Block, util.toArray (arguments));
       this.comps.push (comp);
       return comp;
    },
    list: function () { 
-      var comp = create (List, util.toArray (arguments))
+      var comp = create (List, util.toArray (arguments));
       this.comps.push (comp);
       return comp;
    },

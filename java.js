@@ -293,16 +293,18 @@ function createGroupClass (g, ns, schema, ent, base, mode, modifier)
 
 function createEnum (d, ent, modifier) 
 {
-   var enm = ent.list ("public %senum %s", modifier ? modifier + " " : "",
+   var enm = ent.block ("public %senum %s", modifier ? modifier + " " : "",
 		       escName (d.name));
-   var nextVal = 0;
-   d.type.symbols.forEach (function (sym) {
-      if (sym.val == nextVal)
-         enm.ln (escName (sym.name));
-      else
-         enm.ln ("%s (%d)", escName (sym.name), sym.val);
-      nextVal = sym.val + 1;
+   var syms = d.type.symbols;
+   syms.forEach (function (sym, pos) {
+      var sep = pos < syms.length - 1 ? ',' : ';';
+      enm.ln ("%s (%d)%s", escName (sym.name), sym.val, sep);
    });
+
+   enm.ln ();
+   enm.ln ("private %s (int val) { this.val = val; }", escName (d.name));
+   enm.ln ("public int getValue () { return val; }");
+   enm.ln ("private final int val;");
 
    ent.ln ();
 }

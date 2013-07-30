@@ -117,7 +117,7 @@ function create (s)
    function onEnumSym (name, val, annots, loc)
    {
       val = val || nextEnumVal;
-      nextEnumVal = val + 1;
+      nextEnumVal = val*1 + 1;
       pendType.addSymbol (name, val, annots, loc);
    }
 

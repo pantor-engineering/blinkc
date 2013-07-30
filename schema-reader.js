@@ -787,12 +787,12 @@ function tokenize (s, src)
 	    else
             {
 	       if (isDigit (peek ()))
-		  err ("Expected digit or '>' after '-'");
-	       else
                {
 		  setToken ("Int")
 		  readUInt (c);
 	       }
+	       else
+		  err ("Expected digit or '>' after '-'");
 	    }
             break;
 

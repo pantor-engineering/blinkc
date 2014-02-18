@@ -41,7 +41,9 @@ var path = require ("path");
 module.provide (
    entity,
    renderJava,
-   tail
+   renderCc,
+   tail,
+   indent
 );
 
 function entity ()
@@ -49,10 +51,10 @@ function entity ()
    return new Entity ();
 }
 
-function renderJava (ent, w, pkg, dir, verbosity)
+function renderJava (ent, name, pkg, dir, verbosity)
 {
    pkg = (pkg || "").replace (/\./g, "/");
-   var p = dir + "/" + (pkg ? pkg + "/" : "") + w +  ".java";
+   var p = dir + "/" + (pkg ? pkg + "/" : "") + name +  ".java";
    if (fs.existsSync (dir))
       util.mkdir (path.dirname (p));
    else
@@ -60,6 +62,18 @@ function renderJava (ent, w, pkg, dir, verbosity)
    if (verbosity > 0)
       console.log ("Writing output to " + p);
 
+   fs.writeFileSync (p, renderCurlyBraceFamily (ent));
+}
+
+function renderCc (ent, file, verbosity)
+{
+   if (verbosity > 0)
+      console.log ("Writing output to " + file);
+   fs.writeFileSync (file, renderCurlyBraceFamily (ent));
+}
+
+function renderCurlyBraceFamily (ent)
+{
    var data = [];
    var level = 0;
 
@@ -69,16 +83,19 @@ function renderJava (ent, w, pkg, dir, verbosity)
       },
       onBlock: function (b) {
          if (b.text)
-            indentedln (b.text);
+            indentedln (b.text, b.indent);
          indentedln ("{");
          ++ level;
          walk (b.comps, walker);
          -- level;
-         indentedln ("}");
+	 if (b.tail)
+            indentedln ("}" + b.tail);
+	 else
+            indentedln ("}");
       },
       onLine: function (t)
       {
-         indentedln (t.text);
+         indentedln (t.text, t.indent);
       },
       onComment: function (t)
       {
@@ -86,12 +103,15 @@ function renderJava (ent, w, pkg, dir, verbosity)
       },
       onList: function (b) {
          if (b.text)
-            indentedln (b.text);
+            indentedln (b.text, b.indent);
          indentedln ("{");
          ++ level;
          walk (b.comps, listWalker);
          -- level;
-         indentedln ("}");
+	 if (b.tail)
+            indentedln ("}" + b.tail);
+	 else
+            indentedln ("}");
       }
    }
 
@@ -101,7 +121,7 @@ function renderJava (ent, w, pkg, dir, verbosity)
       },
       onBlock: function (b, pos, a) {
          if (b.text)
-            indentedln (b.text);
+            indentedln (b.text, b.indent);
          indentedln ("{");
          ++ level;
          walk (b.comps, walker);
@@ -110,7 +130,7 @@ function renderJava (ent, w, pkg, dir, verbosity)
       },
       onLine: function (t, pos, a)
       {
-         indentedsepln (t.text, ",", pos, a);
+         indentedsepln (t.text, ",", pos, a, t.indent);
       },
       onComment: function (t, pos, a)
       {
@@ -118,7 +138,7 @@ function renderJava (ent, w, pkg, dir, verbosity)
       },
       onList: function (b, pos, a) {
          if (b.text)
-            indentedln (b.text);
+            indentedln (b.text, b.indent);
          indentedln ("{");
          ++ level;
          walk (b.comps, listWalker);
@@ -127,24 +147,22 @@ function renderJava (ent, w, pkg, dir, verbosity)
       }
    }
 
-   walk (ent, walker);
-   fs.writeFileSync (p, data.join (''));
-
-   function indented (t)
+   function indented (t, adjust)
    {
-      data.push (util.repeat (" ", level * 2));
+      adjust = adjust || 0;
+      data.push (util.repeat (" ", level * 2 + adjust));
       data.push (t);
    }
 
-   function indentedln (t)
+   function indentedln (t, adjust)
    {
-      indented (t);
+      indented (t, adjust);
       data.push ("\n");
    }
 
-   function indentedsepln (t, sep, pos, a)
+   function indentedsepln (t, sep, pos, a, adjust)
    {
-      indented (t);
+      indented (t, adjust);
       if (pos < a.length - 1)
          data.push (sep + "\n");
       else
@@ -155,11 +173,20 @@ function renderJava (ent, w, pkg, dir, verbosity)
    {
       return "// " + t.replace (/\n/g, util.repeat (" ", level * 2) + "// ");
    }
+
+   walk (ent, walker);
+   return data.join ('');
 }
 
 function tail ()
 {
-   return function (comp) { comp.tail = merge (util.toArray (arguments)); }
+   var tail = merge (util.toArray (arguments));
+   return function (comp) { comp.tail = tail; }
+}
+
+function indent (amount)
+{
+   return function (comp) { comp.indent = amount; }
 }
 
 function Entity ()
@@ -186,7 +213,10 @@ util.extend (Entity.prototype, {
       this.comps.push (comp);
       return comp;
    },
-   visit: function (w, pos, a) { visit (w.onEntity, w, this, pos, a) }
+   visit: function (w, pos, a) { visit (w.onEntity, w, this, pos, a) },
+   append: function (ent) {
+      util.append (this.comps, ent.comps);
+   }
 });
 
 function create (ctor, args)
@@ -203,7 +233,7 @@ function merge (args, comp)
    {
       var a = args [i];
       if (util.isArray (a))
-         t.push (merge (a));
+         t.push (merge (a, comp));
       else if (util.isFunction (a))
          t.push (a (comp) || "");
       else

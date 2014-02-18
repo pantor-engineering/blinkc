@@ -723,7 +723,7 @@ function tokenize (s, src)
 	 if (isWs (c))
 	    err ("Missing %s", what);
 	 else
-	    err ("Character not allowed at start of %s", what);
+	    err ("Character not allowed at start of %s: '%s'", what, c);
       }
    }
 
@@ -840,7 +840,7 @@ function tokenize (s, src)
 	       readNameOrKeyword ();
             }
 	    else
-	       err ("Character not allowed here: %q", c);
+	       err ("Character not allowed here: '%s'", c);
             break;
 	 }
       }

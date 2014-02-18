@@ -38,7 +38,10 @@ var schema = require ("./schema");
 
 var BootCl = [
    "blinkc.js",
-   "  -m/--method <method>   # Output method: java, cpp, ...",
+   "  -m/--method <method>   # Output method: java, ...",
+   "                         # If the method name starts with ./ or ../,",
+   "                         # then the implementation is resolved",
+   "                         # realtive to the current directory",
    "  [-o/--output <target>] # Output file or directory depending on method",
    "  [-v/--verbose...]      # Verbosity level, repeat for increased level",
    "  [schema ...]           # Schema files to process"
@@ -49,14 +52,14 @@ var cl = util.parseCmdLine (BootCl, {
 });
 
 var method = cl.get ("method");
+
+if (method.match (/^\.\.?\//) || method.match (/^\//))
+   method = require ("path").resolve (method);
+
 var mod = loadMod ("./" + method) || loadMod (method);
 
 if (mod)
-{
-   if (cl.count ("verbose") > 0)
-      console.error ("Loading output module: " + require.resolve (method));
    mod.start (cl, loadSchemas);
-}
 else
 {
    console.error ("No such output method: " + cl.get ("method"));
@@ -93,7 +96,10 @@ function loadMod (mod)
 {
    try
    {
-      return require (mod);
+      var m = require (mod);
+      if (cl.count ("verbose") > 0)
+	 console.error ("Loading output module: " + require.resolve (mod));
+      return m;
    }
    catch (e)
    {

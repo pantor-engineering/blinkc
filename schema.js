@@ -85,6 +85,10 @@ module.provide (
 
    Location,
 
+   // Returns true if the specified name is qualified by a namespace
+   
+   isQname,
+
    // Enum with types used in he onPrimType event
    
    { TypeCode: TypeCode },
@@ -418,7 +422,7 @@ function resolveRef (t, isSequence, isDynamic)
          return null;
    }
    else
-      return { type: t, isSequence: isSequence }
+      return { type: t, isSequence: isSequence || t.isSequence () }
 }
 
 function dumpSchema ()

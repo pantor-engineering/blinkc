@@ -53,7 +53,9 @@ function start (baseCl, load)
       "  [-n/--wrapper-per-ns]            # Creates a wrapper for each ",
       "                                   # namespace",
       "  [-w/--wrapper <class>]           # Wrapper class name",
-      "  [-e/--extends <class>]           # Group superclass"
+      "  [-e/--extends <class>]           # Group superclass",
+      "  [-d/--print-output-files]        # Print list of files that would be created",
+      "                                   # suitable for dependency generation."
    ]);
 
    verbosity = cl.count ("verbose");
@@ -88,14 +90,20 @@ function transform (schema)
 
    var base = cl.get ("extends");
 
+   var printOutput = cl.has ("print-output-files");
+   var outputFiles = []
+
    if (cl.has ("wrapper"))
    {
       var w = cl.get ("wrapper");
       var defs = schema.getDefines ();
       var grps = schema.getGroups ();
       var pkg = getPackage (w, schema);
-      createWrapperFile (schema, w, pkg, base, defs, grps, dir, 
-			 Mode.SingleWrapper);
+      if (printOutput)
+         outputFiles.push (cg.getJavaFilename (dir, pkg, w))
+      else
+         createWrapperFile (schema, w, pkg, base, defs, grps, dir,
+                            Mode.SingleWrapper);
    }
    else if (cl.has ("wrapper-per-ns"))
    {
@@ -116,8 +124,12 @@ function transform (schema)
                ns = ns.replace (path.extname (ns), "");
             }
          }
-         createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
-			    Mode.WrapperPerNs);
+
+         if (printOutput)
+            outputFiles.push (cg.getJavaFilename (dir, pkg, ns));
+         else
+            createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
+                Mode.WrapperPerNs);
       });
    }
    else // One subpackage per ns
@@ -130,29 +142,40 @@ function transform (schema)
          var defs = schema.getDefines (ns);
          var grps = schema.getGroups (ns);
          var pkg = getPackage (ns, schema);
-	 if (pkg && ns)
-	    pkg = pkg + "." + splitCamelbackLower (ns);
-	 else
-	 {
-	    if (ns)
-	       pkg = splitCamelbackLower (ns);
-	 }
+         if (pkg && ns)
+            pkg = pkg + "." + splitCamelbackLower (ns);
+         else
+         {
+            if (ns)
+            pkg = splitCamelbackLower (ns);
+         }
 
-	 // Enums
-	 
-	 defs.forEach (function (d) {
-	    if (d.type.isEnum ())
-	       createEnumFile (d, schema, pkg, dir);
-	 });
+         // Enums
 
-	 // Classes for groups
+         defs.forEach (function (d) {
+            if (d.type.isEnum ())
+            {
+               if (printOutput)
+                  outputFiles.push (cg.getJavaFilename (pkg, dir, escName (d.name)));
+               else
+                  createEnumFile (d, schema, pkg, dir);
+            }
+         });
 
-	 grps.forEach (function (g) { 
-            createClassFile (g, ns, schema, pkg, base, dir);
-	 });
+         // Classes for groups
+
+         grps.forEach (function (g) {
+            if (printOutput)
+               outputFiles.push (cg.getJavaFilename (pkg, dir, ns));
+            else
+               createClassFile (g, ns, schema, pkg, base, dir);
+         });
 
       });
    }
+
+   if (printOutput)
+      console.log (outputFiles.join (' '));
 }
 
 function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, mode)
@@ -177,7 +200,7 @@ function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, mode)
    
    defs.forEach (function (d) {
       if (d.type.isEnum ())
-	 createEnum (d, wcl, "static");
+         createEnum (d, wcl, "static");
    });
 
    // Classes for groups

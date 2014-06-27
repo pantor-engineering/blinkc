@@ -41,6 +41,7 @@ var path = require ("path");
 module.provide (
    entity,
    renderJava,
+   getJavaFilename,
    renderCc,
    tail,
    indent
@@ -51,10 +52,16 @@ function entity ()
    return new Entity ();
 }
 
+function getJavaFilename (dir, pkg, name)
+{
+   var p = dir + "/" + (pkg ? pkg + "/" : "") + name +  ".java";
+   return p;
+}
+
 function renderJava (ent, name, pkg, dir, verbosity)
 {
    pkg = (pkg || "").replace (/\./g, "/");
-   var p = dir + "/" + (pkg ? pkg + "/" : "") + name +  ".java";
+   var p = getJavaFilename (dir, pkg, name);
    if (fs.existsSync (dir))
       util.mkdir (path.dirname (p));
    else

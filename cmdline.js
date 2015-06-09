@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 var util = require ("./util");
 
 // Public interface

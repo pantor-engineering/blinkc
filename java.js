@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 var util = require ("./util");
 var cg = require ("./codegen");
 var scm = require ("./schema");
@@ -91,7 +93,7 @@ function transform (schema)
    var base = cl.get ("extends");
 
    var printOutput = cl.has ("print-output-files");
-   var outputFiles = []
+   var outputFiles = {}
 
    if (cl.has ("wrapper"))
    {
@@ -99,11 +101,10 @@ function transform (schema)
       var defs = schema.getDefines ();
       var grps = schema.getGroups ();
       var pkg = getPackage (w, schema);
+      var f = createWrapperFile (schema, w, pkg, base, defs, grps, dir,
+                                 Mode.SingleWrapper);
       if (printOutput)
-         outputFiles.push (cg.getJavaFilename (dir, pkg, w))
-      else
-         createWrapperFile (schema, w, pkg, base, defs, grps, dir,
-                            Mode.SingleWrapper);
+         outputFiles [f] = true;
    }
    else if (cl.has ("wrapper-per-ns"))
    {
@@ -111,7 +112,7 @@ function transform (schema)
       if (verbosity > 0)
          console.log ("Wrappers: '" +  namespaces.join (", '") + "'");
 
-      namespaces.forEach (function (ns) { 
+      namespaces.forEach (function (ns) {
          var defs = schema.getDefines (ns);
          var grps = schema.getGroups (ns);
          var pkg = getPackage (ns, schema);
@@ -125,11 +126,10 @@ function transform (schema)
             }
          }
 
+         var f = createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
+                                    Mode.WrapperPerNs);
          if (printOutput)
-            outputFiles.push (cg.getJavaFilename (dir, pkg, ns));
-         else
-            createWrapperFile (schema, ns, pkg, base, defs, grps, dir,
-                Mode.WrapperPerNs);
+            outputFiles [f] = true;
       });
    }
    else // One subpackage per ns
@@ -147,7 +147,7 @@ function transform (schema)
          else
          {
             if (ns)
-            pkg = splitCamelbackLower (ns);
+               pkg = splitCamelbackLower (ns);
          }
 
          // Enums
@@ -155,27 +155,32 @@ function transform (schema)
          defs.forEach (function (d) {
             if (d.type.isEnum ())
             {
+               var f = createEnumFile (d, schema, pkg, dir);
                if (printOutput)
-                  outputFiles.push (cg.getJavaFilename (pkg, dir, escName (d.name)));
-               else
-                  createEnumFile (d, schema, pkg, dir);
+                  outputFiles [f] = true;
             }
          });
 
          // Classes for groups
 
          grps.forEach (function (g) {
+            var f = createClassFile (g, ns, schema, pkg, base, dir);
             if (printOutput)
-               outputFiles.push (cg.getJavaFilename (pkg, dir, ns));
-            else
-               createClassFile (g, ns, schema, pkg, base, dir);
+               outputFiles [f] = true;
          });
 
       });
    }
 
    if (printOutput)
-      console.log (outputFiles.join (' '));
+   {
+      var out = [];
+      for (var f in outputFiles)
+         if (util.isDefined (f))
+            out.push (f);
+
+      console.log (out.join (' '));
+   }
 }
 
 function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, mode)
@@ -197,7 +202,7 @@ function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, mode)
    var wcl = ent.block ("public final class %s", escName (ns));
 
    // Enums
-   
+
    defs.forEach (function (d) {
       if (d.type.isEnum ())
          createEnum (d, wcl, "static");
@@ -211,8 +216,7 @@ function createWrapperFile (schema, ns, pkg, base, defs, grps, dir, mode)
 
    // Write result to file
 
-   cg.renderJava (ent, ns, pkg, dir, verbosity);
-
+   return cg.renderJava (ent, ns, pkg, dir, verbosity);
 }
 
 function createClassFile (g, ns, schema, pkg, base, dir)
@@ -226,7 +230,7 @@ function createClassFile (g, ns, schema, pkg, base, dir)
       ent.ln ("package %s;", pkg).ln ();
 
    createGroupClass (g, ns, schema, ent, base, Mode.PkgPerNs);
-   cg.renderJava (ent, escName (g.name), pkg, dir, verbosity);
+   return cg.renderJava (ent, escName (g.name), pkg, dir, verbosity);
 }
 
 function createEnumFile (d, schema, pkg, dir)
@@ -240,7 +244,7 @@ function createEnumFile (d, schema, pkg, dir)
       ent.ln ("package %s;", pkg).ln ();
 
    createEnum (d, ent);
-   cg.renderJava (ent, escName (d.name), pkg, dir, verbosity);
+   return cg.renderJava (ent, escName (d.name), pkg, dir, verbosity);
 }
 
 function createGroupClass (g, ns, schema, ent, base, mode, modifier) 
@@ -413,6 +417,7 @@ function mapTypeCode (code)
    case scm.TypeCode.I64: case scm.TypeCode.U64: return "long";
    case scm.TypeCode.F64: return "double";
    case scm.TypeCode.Decimal: return "com.pantor.blink.Decimal";
+   case scm.TypeCode.FixedDec: return "long";
    case scm.TypeCode.Date: return "int";
    case scm.TypeCode.TimeOfDayMilli: return "int";
    case scm.TypeCode.TimeOfDayNano: return "long";

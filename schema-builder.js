@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 var util = require ("./util");
 var schema = require ("./schema");
 
@@ -103,6 +105,12 @@ function create (s)
       pendType.size = size;
    }
 
+   function onFixedDecType (rank, scale, annots, loc)
+   {
+      pendType = new schema.Type (schema.TypeCode.FixedDec, rank, annots, loc);
+      pendType.scale = scale;
+   }
+
    function onPrimType (type, rank, annots, loc)
    {
       pendType = new schema.Type (type, rank, annots, loc);
@@ -134,6 +142,7 @@ function create (s)
    return util.toInterface (
       onNsDecl, onStartGroupDef, onStartField, onEndField, onStartDefine,
       onEndDefine, onStartEnum, onTypeRef, onStringType, onBinaryType, 
-      onFixedType, onPrimType, onEnumSym, onSchemaAnnot, onIncrAnnot
+      onFixedType, onPrimType, onFixedDecType, onEnumSym, onSchemaAnnot, 
+      onIncrAnnot
    );
 }

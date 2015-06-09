@@ -33,8 +33,11 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 var util = require ("./util");
 var ndu = require ("util");
+var digest = require ("./digest");
 
 var Presence = util.toEnum (
    "Optional", "Required"
@@ -54,8 +57,8 @@ var PathType = util.toEnum (
 
 var TypeCode = util.toEnum (
    "I8", "U8", "I16", "U16", "I32", "U32", "I64", "U64", "F64", "Decimal",
-   "Date", "TimeOfDayMilli", "TimeOfDayNano", "Nanotime", "Millitime", 
-   "Bool", "Object", "String", "Binary", "Fixed"
+   "FixedDec", "Date", "TimeOfDayMilli", "TimeOfDayNano", "Nanotime", 
+   "Millitime", "Bool", "Object", "String", "Binary", "Fixed"
 );
 
 module.provide (
@@ -68,6 +71,14 @@ module.provide (
    // The Schema constructor
    
    Schema, // ()
+
+   // Group definition constructor, creates a group
+
+   Group, // (name, qname, id, super_, ns, annots, loc)
+
+   // Type definition constructor, creates a type definiftion
+
+   Define, // (name, qname, id, ns, annots, loc)
 
    // Type constructor, creates a type specifier
    
@@ -211,7 +222,7 @@ util.extend (Schema.prototype, {
    },
 
    getAnnotations: function (schemaNs) {
-      if (schemaNs)
+      if (util.isDefined (schemaNs))
          return this.annotsPerNs [schemaNs] || { }
       else
          return this.annots;
@@ -225,12 +236,16 @@ util.extend (Schema.prototype, {
    },
 
    find: function (name, defaultNs) {
-      var d = this.defMap [name] || this.grpMap [name];
-      if (! d && defaultNs && ! isQname (name))
+      var d;
+      if (! isQname (name) && defaultNs)
       {
-         name = defaultNs + ":" + name;
-         d = this.defMap [name] || this.grpMap [name];
+         var qname = defaultNs + ":" + name;
+         d = this.defMap [qname] || this.grpMap [qname];
       }
+
+      if (! d)
+         d = this.defMap [name] || this.grpMap [name];
+
       return d;
    },
 
@@ -239,14 +254,14 @@ util.extend (Schema.prototype, {
    },
    
    getDefines: function (ns) {
-      if (ns)
+      if (util.isDefined (ns))
          return this.definesByNs [ns] || [];
       else
          return this.defines;
    },
 
    getGroups: function (ns) {
-      if (ns)
+      if (util.isDefined (ns))
          return this.groupsByNs [ns] || [];
       else
          return this.groups;
@@ -305,6 +320,7 @@ function Define (name, qname, id, ns, annots, loc)
    this.annos = annots || { };
    this.ns = ns;
    this.loc = loc;
+   this.weight = 0;
 }
 
 util.extend (Define.prototype, {
@@ -402,27 +418,42 @@ util.extend (Location.prototype, {
    }
 });
 
-function resolveRef (t, isSequence, isDynamic)
+function resolveRef (t, isSequence, isDynamic, outermost, innermost)
 {
    if (t.isRef ())
    {
       isDynamic = isDynamic || t.isDynamic ();
       isSequence = isSequence || t.isSequence ();
       var d = this.find (t.name, t.ns);
+      outermost = outermost || d.qname;
       if (d instanceof Group)
-         return { group: d, isSequence: isSequence, isDynamic: isDynamic }
+      {
+         return { 
+            group: d, isSequence: isSequence, isDynamic: isDynamic,
+            refName: outermost, defName: d.qname
+         }
+      }
       else if (d instanceof Define)
       {
          if (d.type.isEnum ())
-            return { define: d, isSequence: isSequence }
+         {
+            return { 
+               define: d, isSequence: isSequence, refName: outermost,
+               defName: d.qname
+            }
+         }
          else
-            return this.resolveRef (d.type, isSequence, isDynamic);
+            return this.resolveRef (d.type, isSequence, isDynamic, outermost,
+                                    d.qname);
       }
       else
          return null;
    }
    else
-      return { type: t, isSequence: isSequence || t.isSequence () }
+      return { 
+         type: t, isSequence: isSequence || t.isSequence (),
+         refName: outermost, defName: innermost
+      }
 }
 
 function dumpSchema ()
@@ -486,6 +517,11 @@ function dumpSchema ()
       {
          spec = "fixed";
          spec += " (" + t.size + ")";
+      }
+      else if (t.code == TypeCode.FixedDec)
+      {
+         spec = "fixedDec";
+         spec += " (" + t.scale + ")";
       }
       else
          spec = util.decapitalize (t.code);
@@ -610,6 +646,14 @@ function finalizeSchema ()
       self.groups.sort (cmpWeight);
       self.allDefs = self.defines.concat (self.groups);
 
+      // Calculate group hashes
+
+      self.groups.forEach (function (g) {
+         g.hash = digest.getHash (g, self);
+      });
+
+      // Group type definitions by namespace
+
       self.definesByNs = { };
       self.defines.forEach (function (d) {
          var ns = self.definesByNs [d.ns];
@@ -617,6 +661,8 @@ function finalizeSchema ()
             self.definesByNs [d.ns] = ns = [ ];
          ns.push (d);
       });
+
+      // Group groups by namespace
 
       self.groupsByNs = { };
       self.groups.forEach (function (g) {

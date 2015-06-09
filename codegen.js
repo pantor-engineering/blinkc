@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict";
+
 var util = require ("./util");
 var ndu = require ("util");
 var fs = require ("fs");
@@ -44,8 +46,17 @@ module.provide (
    getJavaFilename,
    renderCc,
    tail,
-   indent
+   indent,
+   noindent,
+   setVariables
 );
+
+var variables = "";
+
+function setVariables (s)
+{
+   variables = s;
+}
 
 function entity ()
 {
@@ -70,6 +81,8 @@ function renderJava (ent, name, pkg, dir, verbosity)
       console.log ("Writing output to " + p);
 
    fs.writeFileSync (p, renderCurlyBraceFamily (ent));
+
+   return p;
 }
 
 function renderCc (ent, file, verbosity)
@@ -90,7 +103,7 @@ function renderCurlyBraceFamily (ent)
       },
       onBlock: function (b) {
          if (b.text)
-            indentedln (b.text, b.indent);
+            indentedln (b.text, b.indent, b.noindent);
          indentedln ("{");
          ++ level;
          walk (b.comps, walker);
@@ -110,7 +123,7 @@ function renderCurlyBraceFamily (ent)
       },
       onList: function (b) {
          if (b.text)
-            indentedln (b.text, b.indent);
+            indentedln (b.text, b.indent, b.noindent);
          indentedln ("{");
          ++ level;
          walk (b.comps, listWalker);
@@ -120,7 +133,7 @@ function renderCurlyBraceFamily (ent)
 	 else
             indentedln ("}");
       }
-   }
+   };
 
    var listWalker = {
       onEntity: function (e) {
@@ -128,7 +141,7 @@ function renderCurlyBraceFamily (ent)
       },
       onBlock: function (b, pos, a) {
          if (b.text)
-            indentedln (b.text, b.indent);
+            indentedln (b.text, b.indent, b.noindent);
          indentedln ("{");
          ++ level;
          walk (b.comps, walker);
@@ -145,25 +158,29 @@ function renderCurlyBraceFamily (ent)
       },
       onList: function (b, pos, a) {
          if (b.text)
-            indentedln (b.text, b.indent);
+            indentedln (b.text, b.indent, b.noindent);
          indentedln ("{");
          ++ level;
          walk (b.comps, listWalker);
          -- level;
          indentedsepln ("}", ",", pos, a);
       }
-   }
+   };
 
-   function indented (t, adjust)
+   function indented (t, adjust, noindent_)
    {
-      adjust = adjust || 0;
-      data.push (util.repeat (" ", level * 2 + adjust));
+      var indent_;
+      if (noindent_)
+         indent_ = 0;
+      else
+         indent_ = level * 2 + (adjust || 0);
+      data.push (util.repeat (" ", indent_));
       data.push (t);
    }
 
-   function indentedln (t, adjust)
+   function indentedln (t, adjust, noindent_)
    {
-      indented (t, adjust);
+      indented (t, adjust, noindent_);
       data.push ("\n");
    }
 
@@ -187,13 +204,18 @@ function renderCurlyBraceFamily (ent)
 
 function tail ()
 {
-   var tail = merge (util.toArray (arguments));
-   return function (comp) { comp.tail = tail; }
+   var t = merge (util.toArray (arguments));
+   return function (comp) { comp.tail = t; };
 }
 
 function indent (amount)
 {
-   return function (comp) { comp.indent = amount; }
+   return function (comp) { comp.indent = amount; };
+}
+
+function noindent ()
+{
+   return function (comp) { comp.noindent = true; };
 }
 
 function Entity ()
@@ -220,7 +242,7 @@ util.extend (Entity.prototype, {
       this.comps.push (comp);
       return comp;
    },
-   visit: function (w, pos, a) { visit (w.onEntity, w, this, pos, a) },
+   visit: function (w, pos, a) { visit (w.onEntity, w, this, pos, a); },
    append: function (ent) {
       util.append (this.comps, ent.comps);
    }
@@ -246,9 +268,9 @@ function merge (args, comp)
       else
       {
          a = a.toString ();
-         if (util.contains (a, "%"))
+         if (isFormat (a))
          {
-            t.push (ndu.format.apply (ndu, util.flatten (args.slice (i))));
+            t.push (format (a, util.flatten (args.slice (i + 1))));
             break;
          }
          else
@@ -258,13 +280,56 @@ function merge (args, comp)
    return t.join ('');
 }
 
+function isFormat (f)
+{
+   return !! f.match ("[%" + variables + "]");
+}
+
+function format (f, args)
+{
+   if (variables)
+   {
+      var pat = new RegExp ("(\\\\?[" + variables + "]|%s|%d)");
+      var parts = f.split (pat);
+      var bindings = { };
+      return parts.map (function (p) {
+         if (p.length === 1 && variables.indexOf (p) !== -1)
+         {
+            if (! (p in bindings))
+            {
+               if (args.length)
+                  bindings [p] = args.splice (0, 1) [0];
+               else
+                  bindings [p] = p;
+
+            }
+
+            return bindings [p];
+         }
+         else if (p.length === 2 && p.charAt (0) === '\\' &&
+                  variables.indexOf (p.charAt (1)) !== -1)
+         {
+            return p.charAt (1);
+         }
+         else if (args.length && (p === "%s" || p === "%d"))
+         {
+            return ndu.format (p, args.splice (0, 1) [0]);
+         }
+         else
+            return p;
+      }).join ('');
+   }
+   else
+      return ndu.format.apply (ndu, [f].concat (args));
+}
+
 function Line ()
 {
    this.text = "";
 }
 
 util.extend (Line.prototype, {
-   visit: function (w, pos, a) { visit (w.onLine, w, this, pos, a) }
+   visit: function (w, pos, a) { visit (w.onLine, w, this, pos, a); }
 });
 
 function Comment ()
@@ -273,7 +338,7 @@ function Comment ()
 }
 
 util.extend (Comment.prototype, {
-   visit: function (w, pos, a) { visit (w.onComment, w, this, pos, a) }
+   visit: function (w, pos, a) { visit (w.onComment, w, this, pos, a); }
 });
 
 function Block () // extends Entity
@@ -285,7 +350,7 @@ function Block () // extends Entity
 Block.prototype = new Entity ();
 Block.prototype.constructor = Block;
 util.extend (Block.prototype, {
-   visit: function (w, pos, a) { visit (w.onBlock, w, this, pos, a) }
+   visit: function (w, pos, a) { visit (w.onBlock, w, this, pos, a); }
 });
 
 function List () // extends Block
@@ -296,7 +361,7 @@ function List () // extends Block
 List.prototype = new Block ();
 List.prototype.constructor = List;
 util.extend (List.prototype, {
-   visit: function (w, pos, a) { visit (w.onList, w, this, pos, a) }
+   visit: function (w, pos, a) { visit (w.onList, w, this, pos, a); }
 });
 
 function walk (comp, walker)

@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 require ("./extensions"); // Make sure we get module.provide
 var fs = require ("fs");
 
@@ -173,6 +175,11 @@ module.provide (
    
    decapitalize, // (s)
    
+   // Returns the argument string with each letter following a 
+   // character that is not a letter translated into upper case.
+   
+   toCamelCase, // (s)
+
    // Returns a new array where any duplicates in the argument array
    // has been removed
    
@@ -395,6 +402,14 @@ function decapitalize (s)
       return s.charAt (0).toLowerCase () + s.slice (1);
    else
       return s;
+}
+
+function toCamelCase (s)
+{
+   s = (s || "") + "";
+   return s.split (/([^a-zA-Z]+)/).map (function (t) { 
+      return capitalize (t); 
+   }).join ("");
 }
 
 function contains (s1, s2)

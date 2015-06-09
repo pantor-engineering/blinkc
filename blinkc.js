@@ -33,8 +33,11 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 var util = require ("./util");
 var schema = require ("./schema");
+var digest = require ("./digest");
 
 var BootCl = [
    "blinkc.js",
@@ -52,6 +55,16 @@ var cl = util.parseCmdLine (BootCl, {
 });
 
 var method = cl.get ("method");
+
+if (method === "signatures")
+{
+   loadSchemas (cl.getList ("schema"), function (s) {
+      s.getGroups ().forEach (function (g) {
+         console.log ("0x" + g.hash, digest.getSignature (g, s));
+      });
+   });
+   process.exit (0);
+}
 
 if (method.match (/^\.\.?\//) || method.match (/^\//))
    method = require ("path").resolve (method);

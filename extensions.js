@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 // ----------------------------------------------------------------------
 //
 // This module sets up extensions that add to or modifies the Node.js

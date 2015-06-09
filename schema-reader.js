@@ -33,6 +33,8 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 // DAMAGE.
 
+"use strict"
+
 var util = require ("./util");
 var schema = require ("./schema");
 var sbuilder = require ("./schema-builder");
@@ -66,6 +68,7 @@ module.provide (
    //   onBinaryType    (rank, maxSize, annots, loc)
    //   onFixedType     (rank, size, annots, loc)
    //   onPrimType      (type, rank, annots, loc)
+   //   onFixedDecType  (rank, scale, annots, loc)
    //   onEnumSym       (name, val, annots, loc)
    //
    //   onSchemaAnnot   (annots, loc)
@@ -90,6 +93,7 @@ module.provide (
    //   loc      - { line: 1, col: 1, src: "schema.blink" }
    //   maxSize  - string or binary max size
    //   size     - fixed size
+   //   scale    - fixed number of decimals
 
    read, // (file, schemaOrObserver)
 
@@ -116,8 +120,8 @@ function readFromString (data, s, fileName)
 var Events = [
    "NsDecl", "StartGroupDef", "EndGroupDef", "StartField", "EndField",
    "StartDefine", "EndDefine", "StartEnum", "EndEnum", "TypeRef",
-   "StringType", "BinaryType", "FixedType", "PrimType", "EnumSym", 
-   "SchemaAnnot", "IncrAnnot"
+   "StringType", "BinaryType", "FixedType", "PrimType", "FixedDecType",
+   "EnumSym", "SchemaAnnot", "IncrAnnot"
 ];
 
 function makeObs (obs)
@@ -338,6 +342,19 @@ function innerRead (data, fileName, obs)
       obs.onFixedType (r, size, consumeAnnots (), tok.lastLoc ())
    }
 
+   // fixedDec ::=
+   //  | "fixedDec" "(" uInt ")"
+
+   function fixedDec ()
+   {
+      tok.next ();
+      tok.require ("(");
+      var scale = tok.require ("Uint", "fixed decimal scale");
+      tok.require (")");
+      var r = rank ();
+      obs.onFixedDecType (r, scale, consumeAnnots (), tok.lastLoc ())
+   }
+
    // "i8" ... "object"
    
    function primType ()
@@ -363,6 +380,8 @@ function innerRead (data, fileName, obs)
 	 binary ();
       else if (tok.match ("fixed"))
 	 fixed ();
+      else if (tok.match ("fixedDec"))
+	 fixedDec ();
       else if (tok.match ("namespace", "schema", "type"))
 	 tok.expected ("type specifier");
       else if (tok.matchAnyKeyword ())

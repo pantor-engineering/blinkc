@@ -86,8 +86,8 @@ process.on ("uncaughtException", function (evt) {
    var s = evt.toString ();
    if (s.indexOf ("Error:") != 0)
       s = "Error: " + s;
-   console.log (s);
+   console.error (s);
    if (evt.stack && s != evt.stack)
-      console.log (evt.stack);
+      console.error (evt.stack);
    process.exit (1);
 });

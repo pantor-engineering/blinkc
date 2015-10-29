@@ -84,7 +84,7 @@ function isFunction (f)
 
 process.on ("uncaughtException", function (evt) {
    var s = evt.toString ();
-   if (s.indexOf ("Error:") != 0)
+   if (s.indexOf ("Error:") == -1 && s.indexOf ("error:") == -1)
       s = "Error: " + s;
    console.error (s);
    if (evt.stack && s != evt.stack)

@@ -337,8 +337,8 @@ function qualified (d, ns, schema, mode)
    else if (mode == Mode.PkgPerNs)
    {
       var pkg = getPackage (d.ns, schema);
-      return (pkg ? pkg + "." : "") + splitCamelbackLower (d.ns) + "." + 
-         escName (d.name);
+      var nsPkg = d.ns ? (splitCamelbackLower (d.ns) + ".") : "";
+      return (pkg ? pkg + "." : "") + nsPkg + escName (d.name);
    }
    else
    {

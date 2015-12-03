@@ -199,13 +199,13 @@ function createWrapperFile (schema, wrapper, ns, pkg, base, defs, grps, dir,
 
    defs.forEach (function (d) {
       if (d.type.isEnum ())
-         createEnum (d, wcl, "static");
+         createEnum (d, wcl, "static", wrapper);
    });
 
    // Classes for groups
 
    grps.forEach (function (g) { 
-      createGroupClass (g, ns, schema, wcl, base, mode, "static"); 
+      createGroupClass (g, ns, schema, wcl, base, mode, wrapper, "static"); 
    });
 
    // Write result to file
@@ -241,11 +241,11 @@ function createEnumFile (d, schema, pkg, dir)
    return cg.renderJava (ent, escName (d.name), pkg, dir, verbosity);
 }
 
-function createGroupClass (g, ns, schema, ent, base, mode, modifier) 
+function createGroupClass (g, ns, schema, ent, base, mode, wrapper, modifier)
 {
    var ext = "";
    if (g.superGrp)
-      ext = " extends " + qualified (g.superGrp, ns, schema, mode);
+      ext = " extends " + qualified (g.superGrp, ns, schema, mode, wrapper);
    else
    {
       if (base)
@@ -253,13 +253,13 @@ function createGroupClass (g, ns, schema, ent, base, mode, modifier)
    }
 
    var cl = ent.block ("public %sclass %s%s", modifier ? modifier + " " : "",
-		       escName (g.name), ext);
+		       escName (g.name, wrapper), ext);
    ent.ln ();
    
    // Getters and setters
 
    g.fields.forEach (function (f) {
-      var t = getFieldType (f.type, schema, ns, mode);
+      var t = getFieldType (f.type, schema, ns, mode, wrapper);
       var mtodName = escMethodName (f.name);
       cl.ln ("public %s get%s () { return m_%s; }", t, mtodName, f.name);
 
@@ -307,15 +307,15 @@ function createGroupClass (g, ns, schema, ent, base, mode, modifier)
    // Members
 
    g.fields.forEach (function (f) {
-      var t = getFieldType (f.type, schema, ns, mode);
+      var t = getFieldType (f.type, schema, ns, mode, wrapper);
       cl.ln ("private %s m_%s;", t, f.name);
    });
 }
 
-function createEnum (d, ent, modifier) 
+function createEnum (d, ent, modifier, wrapper)
 {
    var enm = ent.block ("public %senum %s", modifier ? modifier + " " : "",
-		       escName (d.name));
+		        escName (d.name, wrapper));
    var syms = d.type.symbols;
    syms.forEach (function (sym, pos) {
       var sep = pos < syms.length - 1 ? ',' : ';';
@@ -323,17 +323,18 @@ function createEnum (d, ent, modifier)
    });
 
    enm.ln ();
-   enm.ln ("private %s (int val) { this.val = val; }", escName (d.name));
+   enm.ln ("private %s (int val) { this.val = val; }", 
+           escName (d.name, wrapper));
    enm.ln ("public int getValue () { return val; }");
    enm.ln ("private final int val;");
 
    ent.ln ();
 }
 
-function qualified (d, ns, schema, mode)
+function qualified (d, ns, schema, mode, wrapper)
 {
    if (mode == Mode.SingleWrapper || d.ns == ns)
-      return escName (d.name);
+      return escName (d.name, wrapper);
    else if (mode == Mode.PkgPerNs)
    {
       var pkg = getPackage (d.ns, schema);
@@ -343,22 +344,21 @@ function qualified (d, ns, schema, mode)
    else
    {
       var pkg = getPackage (d.ns, schema);
-      var wrapper = 
-         d.ns ? escName (d.ns) : getEmptyNsWrapper (schema.getNamespaces ());
-      return (pkg ? pkg + "." : "") + wrapper + "." + escName (d.name);
+      return (pkg ? pkg + "." : "") + escName (wrapper) + "." + 
+         escName (d.name, wrapper);
    }
 }
 
-function getFieldType (t, schema, ns, mode)
+function getFieldType (t, schema, ns, mode, wrapper)
 {
    if (t.isRef ())
    {
       var r = schema.resolveRef (t);
       var jt;
       if (r.group)
-         jt = qualified (r.group, ns, schema, mode);
+         jt = qualified (r.group, ns, schema, mode, wrapper);
       else if (r.define)
-         jt = qualified (r.define, ns, schema, mode);
+         jt = qualified (r.define, ns, schema, mode, wrapper);
       else
          jt = mapTypeCode (r.type.code);
       return jt + (r.isSequence ? " []" : "");
@@ -439,12 +439,22 @@ var JavaKeyword = { };
    "true", "false", "null" 
 ].forEach (function (w) { JavaKeyword [w] = true; });
 
-function escName (n)
+function escName (n, wrapper)
 {
    if (util.endsWith (n, "_") || JavaKeyword [n])
-      return n + "_";
+   {
+      if (n === wrapper)
+         return n + "__";
+      else
+         return n + "_";
+   }
    else
-      return n;
+   {
+      if (n === wrapper)
+         return n + "_";
+      else
+         return n;
+   }
 }
 
 function escMethodName (n)

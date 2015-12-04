@@ -46,22 +46,27 @@ var cl;
 var verbosity;
 
 var Mode = util.toEnum ("PkgPerNs", "WrapperPerNs", "SingleWrapper");
+var useLongFixedDec = false;
 
 function start (baseCl, load)
 {
    cl = util.parseCmdLine ([
       baseCl.getSpec (),
-      "  [-p/--package <pkg>]             # Java package for generated files",
-      "  [-n/--wrapper-per-ns]            # Creates a wrapper for each ",
-      "                                   # namespace",
-      "  [-w/--wrapper <class>]           # Wrapper class name",
-      "  [-e/--extends <class>]           # Group superclass",
-      "  [-d/--print-output-files]        # Print list of files that would be created",
-      "                                   # suitable for dependency generation."
+      "  [-p/--package <pkg>]       # Java package for generated files",
+      "  [-n/--wrapper-per-ns]      # Creates a wrapper for each ",
+      "                             # namespace",
+      "  [-w/--wrapper <class>]     # Wrapper class name",
+      "  [-e/--extends <class>]     # Group superclass",
+      "  [--use-long-fixeddec]      # Use long integers to represent",
+      "                             # fixed decimals instead of FixedDec",
+      "                             # instances",
+      "  [-d/--print-output-files]  # Print list of files that would be created",
+      "                             # suitable for dependency generation."
    ]);
 
    verbosity = cl.count ("verbose");
    load (cl.getList ("schema"), transform);
+   useLongFixedDec = cl.has ("use-long-fixeddec");
 }
 
 function transform (schema)
@@ -360,11 +365,11 @@ function getFieldType (t, schema, ns, mode, wrapper)
       else if (r.define)
          jt = qualified (r.define, ns, schema, mode, wrapper);
       else
-         jt = mapTypeCode (r.type.code);
+         jt = mapType (r.type);
       return jt + (r.isSequence ? " []" : "");
    }
    else
-      return mapTypeCode (t.code) + (t.isSequence () ? " []" : "");
+      return mapType (t) + (t.isSequence () ? " []" : "");
 }
 
 function getPackage (ns, schema)
@@ -402,9 +407,9 @@ function usesPodType (t, schema)
    }
 }
 
-function mapTypeCode (code)
+function mapType (t)
 {
-   switch (code)
+   switch (t.code)
    {
    case scm.TypeCode.I8: case scm.TypeCode.U8: return "byte";
    case scm.TypeCode.I16: case scm.TypeCode.U16: return "short";
@@ -412,7 +417,17 @@ function mapTypeCode (code)
    case scm.TypeCode.I64: case scm.TypeCode.U64: return "long";
    case scm.TypeCode.F64: return "double";
    case scm.TypeCode.Decimal: return "com.pantor.blink.Decimal";
-   case scm.TypeCode.FixedDec: return "long";
+   case scm.TypeCode.FixedDec:
+      if (useLongFixedDec)
+         return "long";
+      else
+      {
+         if (t.scale >= 0 && t.scale <= 10)
+            return "com.pantor.blink.FixedDec._" + t.scale;
+         else
+            return "com.pantor.blink.FixedDec";
+      }
+
    case scm.TypeCode.Date: return "int";
    case scm.TypeCode.TimeOfDayMilli: return "int";
    case scm.TypeCode.TimeOfDayNano: return "long";

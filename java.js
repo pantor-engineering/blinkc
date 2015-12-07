@@ -44,6 +44,7 @@ module.provide (start);
 
 var cl;
 var verbosity;
+var emptyNsWrapper = "Default";
 
 var Mode = util.toEnum ("PkgPerNs", "WrapperPerNs", "SingleWrapper");
 var useLongFixedDec = false;
@@ -117,11 +118,13 @@ function transform (schema)
       if (verbosity > 0)
          console.log ("Wrappers: '" +  namespaces.join ("', '") + "'");
 
+      emptyNsWrapper = cl.get ("wrapper") || getEmptyNsWrapper (namespaces);
+
       namespaces.forEach (function (ns) {
          var defs = schema.getDefines (ns);
          var grps = schema.getGroups (ns);
          var pkg = getPackage (ns, schema);
-         var w = ns || cl.get ("wrapper") || getEmptyNsWrapper (namespaces);
+         var w = ns || emptyNsWrapper;
          var f = createWrapperFile (schema, w, ns, pkg, base, defs, grps, dir,
                                     Mode.WrapperPerNs);
          if (printOutput)
@@ -348,9 +351,8 @@ function qualified (d, ns, schema, mode, wrapper)
    }
    else
    {
-      var pkg = getPackage (d.ns, schema);
-      return (pkg ? pkg + "." : "") + escName (wrapper) + "." + 
-         escName (d.name, wrapper);
+      var w = d.ns || emptyNsWrapper;
+      return (pkg ? pkg + "." : "") + escName (w) + "." + escName (d.name, w);
    }
 }
 

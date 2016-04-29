@@ -667,10 +667,10 @@ function tokenize (s, src)
             return;
    }
 
-   function isWs (c) { return /\s/.test (c); }
-   function isDigit (c) { return /\d/.test (c); }
-   function isHexDigit (c) { return /[0-9a-fA-F]/.test (c); }
-   function isNameStartChar (c) { return /[a-zA-Z_]/.test (c); }
+   function isWs (c) { return c && /\s/.test (c); }
+   function isDigit (c) { return c && /\d/.test (c); }
+   function isHexDigit (c) { return c && /[0-9a-fA-F]/.test (c); }
+   function isNameStartChar (c) { return c && /[a-zA-Z_]/.test (c); }
    function isNameChar (c) { return isNameStartChar (c) || isDigit (c); }
 
    function clearText () { pend.val = ""; }
@@ -748,7 +748,8 @@ function tokenize (s, src)
 
    function readNcName ()
    {
-      while (isNameChar (peek ())) appendText (get ());
+      while (isNameChar (peek ())) 
+         appendText (get ());
    }
 
    function readNameOrKeyword ()

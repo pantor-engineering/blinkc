@@ -69,7 +69,7 @@ function getJavaFilename (dir, pkg, name)
    return p;
 }
 
-function renderJava (ent, name, pkg, dir, verbosity)
+function renderJava (ent, name, pkg, dir, props /* or verbosity */)
 {
    pkg = (pkg || "").replace (/\./g, "/");
    var p = getJavaFilename (dir, pkg, name);
@@ -77,19 +77,47 @@ function renderJava (ent, name, pkg, dir, verbosity)
       util.mkdir (path.dirname (p));
    else
       throw "Target directory '" + dir + "' must exist"; 
-   if (verbosity > 0)
-      console.log ("Writing output to " + p);
 
-   fs.writeFileSync (p, renderCurlyBraceFamily (ent));
+   writeCurlyBraceFamily (p, ent, props);
 
    return p;
 }
 
-function renderCc (ent, file, verbosity)
+function renderCc (ent, file, props /* or verbosity */)
 {
-   if (verbosity > 0)
-      console.log ("Writing output to " + file);
-   fs.writeFileSync (file, renderCurlyBraceFamily (ent));
+   writeCurlyBraceFamily (file, ent, props);
+}
+
+function writeCurlyBraceFamily (file, ent, props /* or verbosity */)
+{
+   if (util.isNumber (props))
+      props = { verbosity: props };
+   else
+      props = props || { verbosity: 0 };
+
+   var content = renderCurlyBraceFamily (ent);
+
+   function writeContent ()
+   {
+      if (props.verbosity > 0)
+         console.log ("Writing output to " + file);
+      fs.writeFileSync (file, content);
+   }
+
+   if (props.onlyModified && fs.existsSync (file))
+   {
+      var exisiting = fs.readFileSync (file);
+      if (content != exisiting)
+         writeContent ();
+      else
+      {
+         if (props.verbosity > 0)
+            console.log ("Skip generating file with identical content: " +
+                         file);
+      }
+   }
+   else
+      writeContent ();
 }
 
 function renderCurlyBraceFamily (ent)

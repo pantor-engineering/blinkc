@@ -15,4 +15,6 @@ the `.java` files will be placed in directory structure matching the
 package under the target directory `src`.
 
 You may specify `-h/--help` to `blinkc.js` to get a description of the
-available options.
+available options. The help option is only available when you have specified
+an output method `-m/--method` since most of the options are specific to
+the selected output method.

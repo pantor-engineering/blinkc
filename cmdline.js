@@ -121,7 +121,7 @@ function parse (spec, props)
    if (props.disableHelp)
    {
       if (result.report)
-         throw getErrorReport (result, parser);
+         throw result.report + "\n\n" + getUsage (parser, props);
       else
          return result.cl;
    }
@@ -600,7 +600,7 @@ function createParser (spec, props)
 
    function setupDefaultDefs ()
    {
-      if (! isDefined ("help"))
+      if (! isDefined ("help") && ! props.disableHelp)
          addDefaultDef ("help", "h", "", "Print this help text");
    }
 
